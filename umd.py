@@ -49,7 +49,7 @@ def _ee(geom, thresh, asset_id):
         'reducer': ee.Reducer.sum(),
         'geometry': region,
         'bestEffort': True,
-        'scale': 90
+        'scale': 27
     }
 
     # Calculate stats
