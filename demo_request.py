@@ -1,4 +1,12 @@
 import requests
+import sys
+
+try:
+    endpoint = sys.argv[1]
+except:
+    print 'endpoint argument required-- options are loss or biomass'
+    sys.exit()
+
 
 # or using cURL on windows
 # curl -X POST -H "Content-Type: application/json" -d "{\"test\": \"data\"}" http://localhost:5000
@@ -12,7 +20,7 @@ end = '2010'
 payload = {'geojson': geojson, 'thresh': thresh, 'start': start, 'end': end}
 
 headers = {'Content-Type': 'application/json'}
-url = r'http://localhost:5000/'
+url = r'http://localhost:5000/{0}'.format(endpoint)
 
 r = requests.post(url, headers=headers, json=payload)
 

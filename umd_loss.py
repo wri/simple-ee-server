@@ -49,7 +49,7 @@ def _ee(geom, thresh, asset_id):
         'reducer': ee.Reducer.sum(),
         'geometry': region,
         'bestEffort': True,
-        'scale': 90
+        'scale': 27
     }
 
     # Calculate stats
@@ -59,8 +59,6 @@ def _ee(geom, thresh, asset_id):
     area_results = area_stats.getInfo()
 
     return area_results
-
-
 
 
 def _get_coords(geojson):
@@ -73,7 +71,6 @@ def _get_coords(geojson):
             
             
 def _order_loss_hist(data, begin, end):
-
     return [data[str(y)] for y in range(int(begin), int(end) + 1)]
 
 
@@ -90,12 +87,18 @@ def _execute_geojson(thresh, geojson, begin, end):
 
     loss = _order_loss_hist(loss_by_year, begin, end)
 
-    # Prepare result object
-    result = {}
-    result['loss'] = loss
-
-    return result
+    return {'result': loss}
 
     
 def calc_loss(thresh, geojson, begin, end):
     return json.dumps(_execute_geojson(thresh, geojson, begin, end))
+    
+    
+if __name__ == '__main__':
+    geojson = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-56.832275390625,-21.637005211106306],[-57.3651123046875,-22.715390019335942],[-56.4,-23.49347666096087],[-55.2504545454,-22.649502094242195],[-55.8599853515625,-21.058870866501525],[-56.832275390625,-21.637005211106306]]]}}]}
+
+    thresh = '30'
+    start = '2001'
+    end = '2010'
+    
+    print json.dumps(_execute_geojson(thresh, geojson, start, end))
