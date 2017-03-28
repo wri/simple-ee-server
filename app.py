@@ -1,10 +1,9 @@
 from flask import Flask, request
 import json
 from umd_loss import calc_loss
-from umd_biomass import calc_biomass_and_loss
+from umd_globecover import calc_globecover
 
 app = Flask(__name__)
-
 
 @app.route('/loss', methods=['POST'])
 def loss():
@@ -20,8 +19,8 @@ def loss():
     
     return output
 
-@app.route('/biomass', methods=['POST'])
-def biomass():
+@app.route('/globecover', methods=['POST'])
+def globecover():
 
     print request.method
 
@@ -29,7 +28,7 @@ def biomass():
     print data
     
     # when testing locally, need to remove the json.loads() from data['geojson'] for some reason
-    output = calc_biomass_and_loss(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
+    output = calc_globecover(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
     print output
     
     return output

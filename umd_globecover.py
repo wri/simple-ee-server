@@ -4,24 +4,7 @@ import json
 import logging
 import sys
 
-
-# source
-# https://code.earthengine.google.com/75f17d0ce29c96d62ff533963eec1fc5
-
-# todo -- figure out how to pair loss year to pixel count, given that histograms are 
-# often truncated. need to use bucketMeans array to do it
-# unclear how to deal with the 1.5/2.5/3.5 values though
-
-# actually doesn't seem to really matter
-# any values of 1.5 etc don't match up to actual counts
-
-# need to build a dict like 
-sample_result_dict = {'results': {'broadleaft forest': {2002: 23, 2005: 12, 2015: 313},
-                                  'pine forest': {2002: 23, 2005: 12, 2015: 313}}
-                                  
-# then fill in the missing data with 0s
-# then go through the order and return {'forest': [year1, year2, year3]} for all years of interest
-                                  
+# source: https://code.earthengine.google.com/75f17d0ce29c96d62ff533963eec1fc5                                  
 
 def _get_thresh_image(thresh, asset_id):
     """Renames image bands using supplied threshold and returns image."""
@@ -86,46 +69,48 @@ def _execute_geojson(thresh, geojson, begin, end):
     # Authenticate to GEE and maximize the deadline
     ee.Initialize()
     ee.data.setDeadline(60000)
-    geojson = json.loads(geojson)
+    #geojson = json.loads(geojson)
     
     # Loss and globcover histogram
     loss_and_lulc = _ee_globcover(geojson, thresh, r'projects/wri-datalab/HansenComposite_14-15', r"ESA/GLOBCOVER_L4_200901_200912_V2_3")
     
-    print loss_and_lulc
-    
     logging.info('Loss_and_LULC histograms: %s' % loss_and_lulc)
 
     # Prepare result object
-    result_dict = _order_loss_hist(loss_and_lulc, begin, end)
+    result_dict = _format_response(loss_and_lulc, begin, end)
 
     return {'result': result_dict}
-    
-def _order_loss_hist(data, begin, end):
-    
-    lulc_dict = {x['globe_cover_val']: x['histogram']['histogram'] for x in data['groups']}
-    
-    start_index = int(begin[2:])
-    end_index = int(end[2:]) + 1
-    
+
+def _format_response(data, begin, end):
+
+    requested_years = range(int(begin), int(end) + 1)
+
     final_dict = {}
-    
-    for lulc_code, histogram in lulc_dict.iteritems():
-        filtered_hist = histogram[start_index:end_index]
+
+    for row in data['groups']:
         
-        if filtered_hist:
-            final_dict[str(lulc_code)] = [str(val) for val in filtered_hist]
+        globe_cover_val = row['globe_cover_val']
+        
+        bucket_list = row['histogram']['bucketMeans']
+        count_list = row['histogram']['histogram']
+        data_pairs = zip(bucket_list, count_list)
+        
+        # remove zeros
+        data_pairs = [(2000 + int(bucket), int(count)) for bucket, count in data_pairs if (int(bucket) != 0 and int(count) != 0)]
+        
+        final_dict[globe_cover_val] = {year: count for year, count in data_pairs if year in requested_years}
 
     return final_dict
 
-
-def calc_biomass_and_loss(thresh, geojson, begin, end):
+def calc_globecover(thresh, geojson, begin, end):
     return json.dumps(_execute_geojson(thresh, geojson, begin, end))
     
 if __name__ == '__main__':
+
     geojson = json.dumps({"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-56.832275390625,-21.637005211106306],[-57.3651123046875,-22.715390019335942],[-56.4,-23.49347666096087],[-55.2504545454,-22.649502094242195],[-55.8599853515625,-21.058870866501525],[-56.832275390625,-21.637005211106306]]]}}]})
 
     thresh = '30'
     start = '2001'
-    end = '2010'
+    end = '2005'
     
     print json.dumps(_execute_geojson(thresh, geojson, start, end))
