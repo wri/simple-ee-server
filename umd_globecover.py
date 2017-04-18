@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 
-# source: https://code.earthengine.google.com/75f17d0ce29c96d62ff533963eec1fc5                                  
+# source: https://code.earthengine.google.com/daf3a183b5d6526b04c1216ffe86785c                             
 
 def _get_thresh_image(thresh, asset_id):
     """Renames image bands using supplied threshold and returns image."""
@@ -36,20 +36,23 @@ def _get_region(geom):
 def _ee_globcover(geom, thresh, asset_id1, asset_id2):
 
     image1 = _get_thresh_image(thresh, asset_id1)
+    mask_image1 = image1.mask()
+    
     image2 = ee.Image(asset_id2).select('landcover')
+    combine_image = image1.multiply(500).add(image2.updateMask(mask_image1))
+    
     region = _get_region(geom)
-
-    group_args = {"groupField": 1, "groupName": 'globe_cover_val'}
     
     # Reducer arguments
     reduce_args = {
-        'reducer': ee.Reducer.histogram().unweighted().group(**group_args),
+        'reducer': ee.Reducer.frequencyHistogram().unweighted(),
         'geometry': region,
-        'bestEffort': True,
-        'scale': 27.829872698318393
+        'bestEffort': False,
+        'scale': 27.829872698318393,
+        'maxPixels': 1e11
     }
     
-    area_stats = image1.addBands(image2).reduceRegion(**reduce_args).getInfo()
+    area_stats = combine_image.reduceRegion(**reduce_args).getInfo()
 
     return area_stats
 
@@ -69,7 +72,6 @@ def _execute_geojson(thresh, geojson, begin, end):
     # Authenticate to GEE and maximize the deadline
     ee.Initialize()
     ee.data.setDeadline(60000)
-    #geojson = json.loads(geojson)
     
     # Loss and globcover histogram
     loss_and_lulc = _ee_globcover(geojson, thresh, r'projects/wri-datalab/HansenComposite_14-15', r"ESA/GLOBCOVER_L4_200901_200912_V2_3")
@@ -84,21 +86,21 @@ def _execute_geojson(thresh, geojson, begin, end):
 def _format_response(data, begin, end):
 
     requested_years = range(int(begin), int(end) + 1)
+    
+    globcover_vals = [11, 14, 20, 30, 40, 50, 60, 70, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230]
 
-    final_dict = {}
+    empty_year_dict = {year: 0 for year in requested_years}
+    final_dict = {val: empty_year_dict.copy() for val in globcover_vals}
 
-    for row in data['groups']:
+    for combine_value, count in data['loss_30'].iteritems():
+
+        if combine_value != 'null':
         
-        globe_cover_val = row['globe_cover_val']
-        
-        bucket_list = row['histogram']['bucketMeans']
-        count_list = row['histogram']['histogram']
-        data_pairs = zip(bucket_list, count_list)
-        
-        # remove zeros
-        data_pairs = [(2000 + int(bucket), int(count)) for bucket, count in data_pairs if (int(bucket) != 0 and int(count) != 0)]
-        
-        final_dict[globe_cover_val] = {year: count for year, count in data_pairs if year in requested_years}
+            year = 2000 + int(combine_value) / 500
+            globcover = int(combine_value) % 500
+            
+            if year in requested_years:
+                final_dict[globcover][year] = count
 
     return final_dict
 
