@@ -49,7 +49,7 @@ def _ee_globcover(geom, thresh, asset_id1, asset_id2):
         'geometry': region,
         'bestEffort': False,
         'scale': 27.829872698318393,
-        'maxPixels': 1e11
+        'maxPixels': 1e10
     }
     
     area_stats = combine_image.reduceRegion(**reduce_args).getInfo()

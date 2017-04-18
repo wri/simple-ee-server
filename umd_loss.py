@@ -48,9 +48,8 @@ def _ee(geom, thresh, asset_id):
     reduce_args = {
         'reducer': ee.Reducer.sum(),
         'geometry': region,
-        'bestEffort': False,
-        'scale': 27.829872698318393,
-        'maxPixels': 1e9
+        'bestEffort': True,
+        'scale': 27.829872698318393
     }
 
     # Calculate stats
@@ -88,7 +87,7 @@ def _execute_geojson(thresh, geojson, begin, end):
 
     loss = _order_loss_hist(loss_by_year, begin, end)
 
-    return {'result': loss}
+    return {'loss': loss}
 
     
 def calc_loss(thresh, geojson, begin, end):
