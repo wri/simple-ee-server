@@ -14,7 +14,7 @@ def loss():
     print data
     
     # when testing locally, need to remove the json.loads() from data['geojson'] for some reason
-    output = calc_loss(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
+    output = calc_loss(data['thresh'], data['geojson'], data['start'], data['end'])
     print output
     
     return output
@@ -28,7 +28,7 @@ def globecover():
     print data
     
     # when testing locally, need to remove the json.loads() from data['geojson'] for some reason
-    output = calc_globecover(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
+    output = calc_globecover(data['thresh'], data['geojson'], data['start'], data['end'])
     print output
     
     return output
