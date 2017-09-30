@@ -5,6 +5,7 @@ from umd_globecover import calc_globecover
 
 app = Flask(__name__)
 
+
 @app.route('/loss', methods=['POST'])
 def loss():
 
@@ -14,13 +15,14 @@ def loss():
     print data
     
     # when testing locally, need to remove the json.loads() from data['geojson'] for some reason
-    output = calc_loss(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
+    output = calc_loss(data['thresh'], data['geojson'], data['start'], data['end'])
     print output
     
     return output
 
-@app.route('/globecover', methods=['POST'])
-def globecover():
+
+@app.route('/globcover', methods=['POST'])
+def globcover():
 
     print request.method
 
@@ -28,7 +30,7 @@ def globecover():
     print data
     
     # when testing locally, need to remove the json.loads() from data['geojson'] for some reason
-    output = calc_globecover(data['thresh'], json.loads(data['geojson']), data['start'], data['end'])
+    output = calc_globecover(data['thresh'], data['geojson'], data['start'], data['end'])
     print output
     
     return output

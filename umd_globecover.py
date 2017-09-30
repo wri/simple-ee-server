@@ -1,69 +1,36 @@
 import ee
-import os
 import json
 import logging
-import sys
 
-# source: https://code.earthengine.google.com/daf3a183b5d6526b04c1216ffe86785c                             
-
-def _get_thresh_image(thresh, asset_id):
-    """Renames image bands using supplied threshold and returns image."""
-    image = ee.Image(asset_id)
-    
-    band_name = 'loss_{}'.format(thresh)
-   
-    return image.select(band_name)
-
-def _get_type(geojson):
-    if geojson.get('features') is not None:
-        return geojson.get('features')[0].get('geometry').get('type')
-    elif geojson.get('geometry') is not None:
-        return geojson.get('geometry').get('type')
-    else:
-        return geojson.get('type')
-
-def _get_region(geom):
-    """Return ee.Geometry from supplied GeoJSON object."""
-    poly = _get_coords(geom)
-    ptype = _get_type(geom)
-    if ptype.lower() == 'multipolygon':
-        region = ee.Geometry.MultiPolygon(poly)
-    else:
-        region = ee.Geometry.Polygon(poly)
-    return region
+from utilities import geom_utils
 
 
 def _ee_globcover(geom, thresh, asset_id1, asset_id2):
 
-    image1 = _get_thresh_image(thresh, asset_id1)
+    image1 = geom_utils.get_thresh_image(thresh, asset_id1)
     mask_image1 = image1.mask()
     
     image2 = ee.Image(asset_id2).select('landcover')
     combine_image = image1.multiply(500).add(image2.updateMask(mask_image1))
+
+    # combine_image = ee.Image(asset_id2).select('landcover')
+    combine_image = combine_image.addBands([ee.Image.pixelArea()])
     
-    region = _get_region(geom)
+    region = geom_utils.get_region(geom)
     
     # Reducer arguments
     reduce_args = {
-        'reducer': ee.Reducer.frequencyHistogram().unweighted(),
+        'reducer': ee.Reducer.frequencyHistogram().unweighted().group(),
         'geometry': region,
         'bestEffort': False,
         'scale': 27.829872698318393,
-        'maxPixels': 1e10
+        'maxPixels': 1e13
     }
     
     area_stats = combine_image.reduceRegion(**reduce_args).getInfo()
+    # print area_stats
 
     return area_stats
-
-
-def _get_coords(geojson):
-    if geojson.get('features') is not None:
-        return geojson.get('features')[0].get('geometry').get('coordinates')
-    elif geojson.get('geometry') is not None:
-        return geojson.get('geometry').get('coordinates')
-    else:
-        return geojson.get('coordinates')
 
 
 def _execute_geojson(thresh, geojson, begin, end):
@@ -74,14 +41,18 @@ def _execute_geojson(thresh, geojson, begin, end):
     ee.data.setDeadline(60000)
     
     # Loss and globcover histogram
-    loss_and_lulc = _ee_globcover(geojson, thresh, r'projects/wri-datalab/HansenComposite_14-15', r"ESA/GLOBCOVER_L4_200901_200912_V2_3")
+    loss_and_lulc = _ee_globcover(geojson, thresh, r'projects/wri-datalab/HansenComposite_16', r"ESA/GLOBCOVER_L4_200901_200912_V2_3")
     
     logging.info('Loss_and_LULC histograms: %s' % loss_and_lulc)
+    
+    area_stats = flatten_area_hist(loss_and_lulc)
+    print area_stats
 
     # Prepare result object
-    result_dict = _format_response(loss_and_lulc, begin, end)
+    result_dict = _format_response(area_stats, begin, end)
 
     return {'result': result_dict}
+
 
 def _format_response(data, begin, end):
 
@@ -92,7 +63,7 @@ def _format_response(data, begin, end):
     empty_year_dict = {year: 0 for year in requested_years}
     final_dict = {val: empty_year_dict.copy() for val in globcover_vals}
 
-    for combine_value, count in data['loss_30'].iteritems():
+    for combine_value, count in data.iteritems():
 
         if combine_value != 'null':
         
@@ -104,15 +75,24 @@ def _format_response(data, begin, end):
 
     return final_dict
 
+
 def calc_globecover(thresh, geojson, begin, end):
     return json.dumps(_execute_geojson(thresh, geojson, begin, end))
     
-if __name__ == '__main__':
 
-    geojson = json.dumps({"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-56.832275390625,-21.637005211106306],[-57.3651123046875,-22.715390019335942],[-56.4,-23.49347666096087],[-55.2504545454,-22.649502094242195],[-55.8599853515625,-21.058870866501525],[-56.832275390625,-21.637005211106306]]]}}]})
+def flatten_area_hist(area_hist):
+    out_dict = {}
 
-    thresh = '30'
-    start = '2001'
-    end = '2005'
-    
-    print json.dumps(_execute_geojson(thresh, geojson, start, end))
+    for output_group in area_hist['groups']:
+        lulc_val = output_group['group']
+        m2_val = 0
+        
+        for pixel_size, pixel_count in output_group['histogram'].iteritems():
+            m2_val += float(pixel_size) * pixel_count
+
+        # convert m2 to ha
+        out_dict[lulc_val] = m2_val / 10000
+
+    print out_dict
+        
+    return out_dict

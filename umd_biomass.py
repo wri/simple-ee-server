@@ -1,50 +1,15 @@
 import ee
-import os
 import json
 import logging
-import sys
 
-
-def _get_thresh_image(thresh, asset_id):
-    """Renames image bands using supplied threshold and returns image."""
-    image = ee.Image(asset_id)
-
-    # Select out the gain band if it exists
-    if 'gain' in asset_id:
-        before = image.select('.*_' + thresh, 'gain').bandNames()
-    else:
-        before = image.select('.*_' + thresh).bandNames()
-
-    after = before.map(
-        lambda x: ee.String(x).replace('_.*', ''))
-
-    image = image.select(before, after)
-    return image
-
-def _get_type(geojson):
-    if geojson.get('features') is not None:
-        return geojson.get('features')[0].get('geometry').get('type')
-    elif geojson.get('geometry') is not None:
-        return geojson.get('geometry').get('type')
-    else:
-        return geojson.get('type')
-
-def _get_region(geom):
-    """Return ee.Geometry from supplied GeoJSON object."""
-    poly = _get_coords(geom)
-    ptype = _get_type(geom)
-    if ptype.lower() == 'multipolygon':
-        region = ee.Geometry.MultiPolygon(poly)
-    else:
-        region = ee.Geometry.Polygon(poly)
-    return region
+from utilities import geom_utils
 
 
 def _ee_biomass(geom, thresh, asset_id1, asset_id2):
 
-    image1 = _get_thresh_image(thresh, asset_id1)
+    image1 = geom_utils.get_thresh_image(thresh, asset_id1)
     image2 = ee.Image(asset_id2)
-    region = _get_region(geom)
+    region = geom_utils.get_region(geom)
 
     # Reducer arguments
     reduce_args = {
@@ -66,15 +31,6 @@ def _ee_biomass(geom, thresh, asset_id1, asset_id2):
     return area_results
 
 
-def _get_coords(geojson):
-    if geojson.get('features') is not None:
-        return geojson.get('features')[0].get('geometry').get('coordinates')
-    elif geojson.get('geometry') is not None:
-        return geojson.get('geometry').get('coordinates')
-    else:
-        return geojson.get('coordinates')
-
-
 def _execute_geojson(thresh, geojson, begin, end):
     """Query GEE using supplied args with threshold and geojson."""
 
@@ -91,19 +47,11 @@ def _execute_geojson(thresh, geojson, begin, end):
     biomass_loss =  _order_loss_hist(loss_by_year, begin, end)
 
     return {'result': biomass_loss}
-    
+
+
 def _order_loss_hist(data, begin, end):
     return [data[str(y)] for y in range(int(begin), int(end) + 1)]
 
 
 def calc_biomass_and_loss(thresh, geojson, begin, end):
     return json.dumps(_execute_geojson(thresh, geojson, begin, end))
-    
-if __name__ == '__main__':
-    geojson = json.dumps({"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-56.832275390625,-21.637005211106306],[-57.3651123046875,-22.715390019335942],[-56.4,-23.49347666096087],[-55.2504545454,-22.649502094242195],[-55.8599853515625,-21.058870866501525],[-56.832275390625,-21.637005211106306]]]}}]})
-
-    thresh = '30'
-    start = '2001'
-    end = '2010'
-    
-    print json.dumps(_execute_geojson(thresh, geojson, start, end))
